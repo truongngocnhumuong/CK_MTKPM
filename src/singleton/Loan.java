@@ -1,6 +1,9 @@
 package singleton;
 
 import java.util.Date;
+import strategy.*;
+
+import strategy.LateFeeCalculator;
 //Lớp Loan quản lý giao dịch mượn sách
 public class Loan {
 	private String id;
@@ -9,13 +12,12 @@ public class Loan {
     private Date ngayMuon;
     private Date ngayDenHan;
     private Date ngayTra;
-	public Loan(String id, Book book, Member member, Date ngayMuon, Date ngayDenHan, Date ngayTra) {
+	public Loan(String id, Book book, Member member, Date ngayMuon, Date ngayDenHan) {
 		this.id = id;
 		this.book = book;
 		this.member = member;
 		this.ngayMuon = ngayMuon;
 		this.ngayDenHan = ngayDenHan;
-		this.ngayTra = ngayTra;
 	}
 	public Date getNgayTra() {
 		return ngayTra;
@@ -39,16 +41,13 @@ public class Loan {
 		return ngayDenHan;
 	}
 	// Tính phí trễ hạn với Strategy pattern (giai thich ki)
-	//public double calculateLateFee(LateFeeCalculator calculator) {
-		//if (ngayTra == null ngayTra.after(ngayDenHan)) {
-			//long diffInMillies = ngayTra != null ? ngayTra.getTime() - ngayDenHan.getTime() : 0;
-			//int daysLate = (int) (diffInMillies / (1000 * 60 * 60 * 24));
-			//return calculator.calculateFee(daysLate);
-
-			
-		//}
-		//return 0.0;
-		
-	//}
+	public double calculateLateFee(LateFeeCalculator calculator) {
+        if (ngayTra == null || ngayTra.after(ngayDenHan)) {
+            long diffInMillies = ngayTra != null ? ngayTra.getTime() - ngayDenHan.getTime() : 0;
+            int daysLate = (int) (diffInMillies / (1000 * 60 * 60 * 24));
+            return calculator.calculateFee(daysLate);
+        }
+        return 0.0;
+    }
 
 }
