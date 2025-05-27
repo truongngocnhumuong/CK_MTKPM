@@ -1,10 +1,11 @@
 package strategy;
 //Triển khai tính phí cao cấp
-public class PremiumFeeCalculator implements LateFeeCalculator{
+public class PremiumFeeCalculator implements FeeCalculator {
+	private static final double DAILY_RATE = 40000;
 
 	@Override
-	public double calculateFee(int daysLate) {
-		return daysLate > 0 ? daysLate * 2.0 : 0.0; // 2 USD/ngày trễ
+	public double calculateFee(long overdueDays) {
+		return overdueDays * DAILY_RATE;
 	}
 
 }

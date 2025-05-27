@@ -25,12 +25,13 @@ public class BookManager {
 	}
 	// Thêm sách vào cơ sở dữ liệu
     public void addBook(Book book) {
-        String sql = "INSERT INTO books (id, title, author, type) VALUES (?, ?, ?, ?)";
+        String sql = "INSERT INTO books (id, title, author, type, favorite) VALUES (?, ?, ?, ?, ?)";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, book.getId());
             pstmt.setString(2, book.getTitle());
             pstmt.setString(3, book.getAuthor());
             pstmt.setString(4, book.getType());
+            pstmt.setInt(5, book.isFavorite() ? 1 : 0);
             pstmt.executeUpdate();
         } catch (SQLException e) {
             System.out.println("Error adding book: " + e.getMessage());
@@ -51,12 +52,13 @@ public class BookManager {
     
  // Cập nhật sách
     public void updateBook(Book book) {
-        String sql = "UPDATE books SET title = ?, author = ?, type = ? WHERE id = ?";
+        String sql = "UPDATE books SET title = ?, author = ?, type = ?, favorite = ? WHERE id = ?";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, book.getTitle());
             pstmt.setString(2, book.getAuthor());
             pstmt.setString(3, book.getType());
-            pstmt.setString(4, book.getId());
+            pstmt.setInt(4, book.isFavorite() ? 1 : 0);
+            pstmt.setString(5, book.getId());
             pstmt.executeUpdate();
         } catch (SQLException e) {
             System.out.println("Error updating book: " + e.getMessage());
@@ -71,7 +73,13 @@ public class BookManager {
             pstmt.setString(1, bookId);
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
-                return new Book(rs.getString("id"), rs.getString("title"), rs.getString("author"), rs.getString("type"));
+                return new Book(
+                    rs.getString("id"),
+                    rs.getString("title"),
+                    rs.getString("author"),
+                    rs.getString("type"),
+                    rs.getInt("favorite") == 1
+                );
             }
         } catch (SQLException e) {
             System.out.println("Error getting book: " + e.getMessage());
@@ -86,7 +94,13 @@ public class BookManager {
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
-                books.add(new Book(rs.getString("id"), rs.getString("title"), rs.getString("author"), rs.getString("type")));
+                books.add(new Book(
+                    rs.getString("id"),
+                    rs.getString("title"),
+                    rs.getString("author"),
+                    rs.getString("type"),
+                    rs.getInt("favorite") == 1
+                ));
             }
         } catch (SQLException e) {
             System.out.println("Error getting all books: " + e.getMessage());

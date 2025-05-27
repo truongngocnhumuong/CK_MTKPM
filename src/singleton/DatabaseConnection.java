@@ -44,7 +44,8 @@ public class DatabaseConnection {
 	                id TEXT PRIMARY KEY,
 	                title TEXT NOT NULL,
 	                author TEXT NOT NULL,
-	                type TEXT NOT NULL
+	                type TEXT NOT NULL,
+	                favorite INTEGER DEFAULT 0
 	            )
 	        """;
 		String createMembersTable = """
@@ -62,6 +63,7 @@ public class DatabaseConnection {
 	                borrow_date TEXT,
 	                due_date TEXT,
 	                return_date TEXT,
+	                fee_paid INTEGER DEFAULT 0,
 	                FOREIGN KEY(book_id) REFERENCES books(id),
 	                FOREIGN KEY(member_id) REFERENCES members(id)
 	            )

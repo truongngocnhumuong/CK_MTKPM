@@ -1,16 +1,13 @@
 package strategy;
-//Lớp FeeContext quản lý chiến lược tính phí
-public class FeeContext {
-	private LateFeeCalculator calculator;
 
-	public void setCalculator(LateFeeCalculator calculator) {
+public class FeeContext {
+	private FeeCalculator calculator;
+
+	public void setCalculator(FeeCalculator calculator) {
 		this.calculator = calculator;
 	}
-	public LateFeeCalculator getCalculator() { return calculator; }
-	
-	public double calculateFee(int daysLate) {
-		return calculator.calculateFee(daysLate);
-		
-	}
 
+	public double calculateFee(long overdueDays) {
+		return calculator != null ? calculator.calculateFee(overdueDays) : 0;
+	}
 }
