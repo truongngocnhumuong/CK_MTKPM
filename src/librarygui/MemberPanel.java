@@ -1,9 +1,14 @@
 package librarygui;
 
-import javax.swing.*;
-import javax.swing.table.*;
 import java.awt.*;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.util.ArrayList;
+import java.util.List;
+import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.border.TitledBorder;
+import javax.swing.table.*;
 import singleton.Member;
 import singleton.MemberManager;
 
@@ -14,6 +19,8 @@ public class MemberPanel extends JPanel {
     private JTextField idField;
     private JTextField nameField;
     private JTextField emailField;
+    private JTextField searchField;
+    private JButton searchButton;
 
     public MemberPanel(MainLibraryGUI mainGUI) {
         this.mainGUI = mainGUI;
@@ -22,108 +29,179 @@ public class MemberPanel extends JPanel {
     }
 
     private void setupUI() {
-        setLayout(new BorderLayout(0, 10));
-        
-        // Input Panel
+        setLayout(new BorderLayout(0, 15));
+
+        // Top section
         JPanel topSection = new JPanel();
-        topSection.setLayout(new BorderLayout(0, 5));
-        topSection.setPreferredSize(new Dimension(1024, 346));
+        topSection.setLayout(new BoxLayout(topSection, BoxLayout.Y_AXIS));
 
-        // Form Panel
+        // Search panel ở trên cùng với chiều rộng đầy đủ
+        JPanel searchPanel = createSearchPanel();
+        searchPanel.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createLineBorder(Color.LIGHT_GRAY), "Search", 
+            TitledBorder.LEFT, TitledBorder.TOP));
+        searchPanel.setBackground(new Color(245, 245, 245));
+        searchPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, searchPanel.getPreferredSize().height));
+
+        // Form panel
         JPanel formPanel = createFormPanel();
-        
-        // Button Panel
+        formPanel.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createLineBorder(Color.LIGHT_GRAY), "Form", 
+            TitledBorder.LEFT, TitledBorder.TOP));
+        formPanel.setBackground(new Color(245, 245, 245));
+        formPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, formPanel.getPreferredSize().height));
+
+        // Button panel
         JPanel buttonPanel = createButtonPanel();
+        buttonPanel.setBackground(new Color(245, 245, 245));
+        buttonPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, buttonPanel.getPreferredSize().height));
 
-        // Center the form and add padding
-        JPanel centeringPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 20));
-        centeringPanel.add(formPanel);
-        
-        // Add components to sections
-        JPanel contentPanel = new JPanel(new BorderLayout(0, 20));
-        contentPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
-        contentPanel.add(centeringPanel, BorderLayout.CENTER);
-        contentPanel.add(buttonPanel, BorderLayout.SOUTH);
+        // Add components to top section
+        topSection.add(searchPanel);
+        topSection.add(Box.createVerticalStrut(10));
+        topSection.add(formPanel);
+        topSection.add(Box.createVerticalStrut(10));
+        topSection.add(buttonPanel);
 
-        topSection.add(contentPanel, BorderLayout.CENTER);
-
-        // Member Table Panel
+        // Table panel
         JPanel tablePanel = createTablePanel();
+        tablePanel.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createLineBorder(Color.LIGHT_GRAY), "Data Table", 
+            TitledBorder.LEFT, TitledBorder.TOP));
+        tablePanel.setBackground(new Color(245, 245, 245));
 
-        // Add sections to main panel
-        add(topSection, BorderLayout.NORTH);
-        add(tablePanel, BorderLayout.CENTER);
+        // Split pane
+        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+        splitPane.setTopComponent(topSection);
+        splitPane.setBottomComponent(tablePanel);
+        splitPane.setResizeWeight(0.6);
+        splitPane.setDividerSize(5);
+        splitPane.setBorder(null);
 
-        // Initialize table
+        // Add to main panel
+        add(splitPane, BorderLayout.CENTER);
+
+        // Maintain split proportion
+        addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                splitPane.setDividerLocation(0.6);
+            }
+        });
+
         updateData();
+    }
+
+    private JPanel createSearchPanel() {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 15));
+
+        searchField = new JTextField(40);
+        searchField.setPreferredSize(new Dimension(500, 35));
+        searchField.setFont(new Font("Arial", Font.PLAIN, 14));
+        searchField.putClientProperty("JTextField.placeholderText", "Nhập mã thành viên, tên hoặc email để tìm kiếm...");
+
+        // Thêm DocumentListener để tự động tìm kiếm khi gõ
+        searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { handleSearch(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { handleSearch(); }
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { handleSearch(); }
+        });
+
+        searchButton = new JButton("Làm mới");
+        searchButton.setFont(new Font("Arial", Font.BOLD, 14));
+        searchButton.setPreferredSize(new Dimension(120, 35));
+        searchButton.setBackground(new Color(240, 240, 240));
+        searchButton.setFocusPainted(false);
+        searchButton.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(200, 200, 200)),
+            BorderFactory.createEmptyBorder(5, 15, 5, 15)
+        ));
+
+        searchButton.addActionListener(e -> {
+            searchField.setText("");
+            updateData();
+        });
+
+        panel.add(searchField);
+        panel.add(searchButton);
+
+        return panel;
     }
 
     private JPanel createFormPanel() {
         JPanel formPanel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 10, 5, 10);
+        gbc.insets = new Insets(8, 15, 8, 15);
         gbc.fill = GridBagConstraints.BOTH;
         gbc.anchor = GridBagConstraints.WEST;
 
-        // Initialize form components
-        Dimension fixedSize = new Dimension(250, 40);
+        Dimension fixedSize = new Dimension(400, 35);
         idField = new JTextField();
         nameField = new JTextField();
         emailField = new JTextField();
 
-        // Style components
-        Font inputFont = new Font("Arial", Font.PLAIN, 14);
         Component[] inputs = {idField, nameField, emailField};
+        Font inputFont = new Font("Arial", Font.PLAIN, 14);
         for (Component comp : inputs) {
             comp.setFont(inputFont);
             comp.setPreferredSize(fixedSize);
             comp.setMinimumSize(fixedSize);
         }
 
-        // Labels
         JLabel[] labels = {
             new JLabel("Mã Thành Viên:"),
             new JLabel("Họ Tên:"),
             new JLabel("Email:")
         };
         Font labelFont = new Font("Arial", Font.BOLD, 14);
+        Dimension labelSize = new Dimension(120, 35);
         for (JLabel label : labels) {
             label.setFont(labelFont);
+            label.setPreferredSize(labelSize);
             label.setHorizontalAlignment(SwingConstants.RIGHT);
         }
 
-        // Add components to form
         for (int i = 0; i < labels.length; i++) {
             gbc.gridx = 0;
             gbc.gridy = i;
-            gbc.weightx = 0.3;
+            gbc.weightx = 0.2;
             formPanel.add(labels[i], gbc);
 
             gbc.gridx = 1;
-            gbc.weightx = 0.7;
+            gbc.weightx = 0.8;
             formPanel.add(inputs[i], gbc);
         }
 
-        return formPanel;
+        // Wrap formPanel in a container with padding
+        JPanel formContainer = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        formContainer.add(formPanel);
+        formContainer.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+
+        return formContainer;
     }
 
     private JPanel createButtonPanel() {
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
-        
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 30, 15));
+
         JButton addButton = new JButton("Thêm");
         JButton updateButton = new JButton("Cập Nhật");
         JButton removeButton = new JButton("Xóa");
         JButton refreshButton = new JButton("Làm Mới");
 
-        // Style buttons
-        Dimension buttonSize = new Dimension(120, 35);
+        Dimension buttonSize = new Dimension(150, 40);
         Font buttonFont = new Font("Arial", Font.BOLD, 14);
-        for (JButton button : new JButton[]{addButton, updateButton, removeButton, refreshButton}) {
+        JButton[] buttons = {addButton, updateButton, removeButton, refreshButton};
+        for (JButton button : buttons) {
             button.setFont(buttonFont);
             button.setPreferredSize(buttonSize);
+            button.setBackground(new Color(240, 240, 240));
+            button.setFocusPainted(false);
+            button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(200, 200, 200)),
+                BorderFactory.createEmptyBorder(5, 15, 5, 15)
+            ));
         }
 
-        // Add button actions
         addButton.addActionListener(e -> handleAddMember());
         updateButton.addActionListener(e -> handleUpdateMember());
         removeButton.addActionListener(e -> handleRemoveMember());
@@ -140,15 +218,10 @@ public class MemberPanel extends JPanel {
     private JPanel createTablePanel() {
         JPanel tablePanel = new JPanel(new BorderLayout());
         tablePanel.setBorder(new EmptyBorder(0, 20, 20, 20));
-        
+
         String[] columnNames = {"Mã Thành Viên", "Họ Tên", "Email"};
-        DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
-        
+        DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0);
+
         memberTable = new JTable(tableModel);
         setupTable();
 
@@ -158,20 +231,19 @@ public class MemberPanel extends JPanel {
             "Danh Sách Thành Viên",
             javax.swing.border.TitledBorder.CENTER,
             javax.swing.border.TitledBorder.TOP,
-            new Font("Arial", Font.BOLD, 18)
+            new Font("Arial", Font.BOLD, 16)
         ));
-        
+
         tablePanel.add(scrollPane, BorderLayout.CENTER);
         return tablePanel;
     }
 
     private void setupTable() {
-        memberTable.setFont(new Font("Arial", Font.PLAIN, 16));
-        memberTable.setRowHeight(35);
-        memberTable.getTableHeader().setFont(new Font("Arial", Font.BOLD, 16));
+        memberTable.setFont(new Font("Arial", Font.PLAIN, 14));
+        memberTable.setRowHeight(30);
+        memberTable.getTableHeader().setFont(new Font("Arial", Font.BOLD, 14));
         memberTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
-        // Add selection listener
         memberTable.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 int row = memberTable.getSelectedRow();
@@ -183,12 +255,11 @@ public class MemberPanel extends JPanel {
             }
         });
     }
-
     private void handleAddMember() {
         String id = idField.getText();
         String name = nameField.getText();
         String email = emailField.getText();
-        
+
         if (!validateFields(id, name, email) || !validateDuplicateMember(id)) {
             return;
         }
@@ -203,15 +274,15 @@ public class MemberPanel extends JPanel {
 
     private void handleUpdateMember() {
         String id = idField.getText();
-        Member oldMember = memberManager.getMember(id);
-        if (oldMember != null) {
+        Member existingMember = memberManager.getMember(id);
+
+        if (existingMember != null) {
             String name = nameField.getText();
             String email = emailField.getText();
-            
-            Member newMember = new Member(id, name, email);
-            newMember.registerObserver(mainGUI);
-            memberManager.removeMember(id);
-            memberManager.addMember(newMember);
+
+            Member updatedMember = new Member(id, name, email);
+            updatedMember.registerObserver(mainGUI);
+            memberManager.updateMember(updatedMember);
             updateData();
             clearForm();
             JOptionPane.showMessageDialog(this, "Cập nhật thành viên thành công!");
@@ -222,6 +293,11 @@ public class MemberPanel extends JPanel {
 
     private void handleRemoveMember() {
         String id = idField.getText();
+        if (id.trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Vui lòng nhập mã thành viên cần xóa!", "Lỗi", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
         memberManager.removeMember(id);
         updateData();
         clearForm();
@@ -231,6 +307,27 @@ public class MemberPanel extends JPanel {
     private void handleRefresh() {
         clearForm();
         memberTable.clearSelection();
+        updateData();
+    }
+
+    private void handleSearch() {
+        String query = searchField.getText().trim().toLowerCase();
+        if (query.isEmpty()) {
+            updateData();
+            return;
+        }
+
+        List<Member> searchResults = new ArrayList<>();
+        for (Member member : memberManager.getAllMembers()) {
+            // Tìm kiếm theo ID, tên hoặc email
+            if (member.getId().toLowerCase().contains(query) ||
+                member.getName().toLowerCase().contains(query) ||
+                member.getEmail().toLowerCase().contains(query)) {
+                searchResults.add(member);
+            }
+        }
+
+        updateSearchResults(searchResults);
     }
 
     public void updateData() {
@@ -244,6 +341,18 @@ public class MemberPanel extends JPanel {
             });
         });
         model.fireTableDataChanged();
+    }
+
+    private void updateSearchResults(List<Member> members) {
+        DefaultTableModel model = (DefaultTableModel) memberTable.getModel();
+        model.setRowCount(0);
+        members.forEach(member -> {
+            model.addRow(new Object[]{
+                member.getId(),
+                member.getName(),
+                member.getEmail()
+            });
+        });
     }
 
     private void clearForm() {

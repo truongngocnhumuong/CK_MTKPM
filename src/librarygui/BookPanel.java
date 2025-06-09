@@ -2,14 +2,18 @@ package librarygui;
 
 import abstractfactory.*;
 import decorator.*;
-import javax.swing.*;
-import javax.swing.table.*;
 import java.awt.*;
-import java.util.HashMap;
-import java.util.Map;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.util.*;
+import java.util.List;
+import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.border.TitledBorder;
+import javax.swing.table.*;
 import singleton.Book;
 import singleton.BookManager;
+import strategy.*;
 
 public class BookPanel extends JPanel {
     private MainLibraryGUI mainGUI;
@@ -21,10 +25,16 @@ public class BookPanel extends JPanel {
     private JTextField authorField;
     private JComboBox<String> typeCombo;
 
+    // Tìm kiếm nâng cao
+    private JTextField searchField;
+    private JButton searchButton;
+    private SearchContext<Book> searchContext;
+
     public BookPanel(MainLibraryGUI mainGUI) {
         this.mainGUI = mainGUI;
         this.bookManager = mainGUI.getBookManager();
         this.decoratedBooks = new HashMap<>();
+        this.searchContext = new SearchContext<>();
         loadExistingBooks();
         setupUI();
     }
@@ -38,51 +48,145 @@ public class BookPanel extends JPanel {
     }
 
     private void setupUI() {
-        setLayout(new BorderLayout(0, 10));
-        
-        // Input Panel (45% of height)
+        setLayout(new BorderLayout(0, 15));
+
+        // Top section
         JPanel topSection = new JPanel();
-        topSection.setLayout(new BorderLayout(0, 5));
-        topSection.setPreferredSize(new Dimension(1024, 346));
+        topSection.setLayout(new BoxLayout(topSection, BoxLayout.Y_AXIS));
 
-        // Form Panel
+        // Search panel ở trên cùng với chiều rộng đầy đủ
+        JPanel searchPanel = createSearchPanel();
+        searchPanel.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createLineBorder(Color.LIGHT_GRAY), "Search", 
+            TitledBorder.LEFT, TitledBorder.TOP));
+        searchPanel.setBackground(new Color(245, 245, 245));
+        searchPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, searchPanel.getPreferredSize().height));
+
+        // Form panel
         JPanel formPanel = createFormPanel();
-        
-        // Button Panel
+        formPanel.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createLineBorder(Color.LIGHT_GRAY), "Form", 
+            TitledBorder.LEFT, TitledBorder.TOP));
+        formPanel.setBackground(new Color(245, 245, 245));
+        formPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, formPanel.getPreferredSize().height));
+
+        // Button panel
         JPanel buttonPanel = createButtonPanel();
+        buttonPanel.setBackground(new Color(245, 245, 245));
+        buttonPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, buttonPanel.getPreferredSize().height));
 
-        // Center the form and add padding
-        JPanel centeringPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 20));
-        centeringPanel.add(formPanel);
-        
-        // Add components to sections
-        JPanel contentPanel = new JPanel(new BorderLayout(0, 20));
-        contentPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
-        contentPanel.add(centeringPanel, BorderLayout.CENTER);
-        contentPanel.add(buttonPanel, BorderLayout.SOUTH);
+        // Add components to top section
+        topSection.add(searchPanel);
+        topSection.add(Box.createVerticalStrut(10));
+        topSection.add(formPanel);
+        topSection.add(Box.createVerticalStrut(10));
+        topSection.add(buttonPanel);
 
-        topSection.add(contentPanel, BorderLayout.CENTER);
-
-        // Book Table Panel
+        // Table panel
         JPanel tablePanel = createTablePanel();
+        tablePanel.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createLineBorder(Color.LIGHT_GRAY), "Data Table", 
+            TitledBorder.LEFT, TitledBorder.TOP));
+        tablePanel.setBackground(new Color(245, 245, 245));
 
-        // Add sections to main panel
-        add(topSection, BorderLayout.NORTH);
-        add(tablePanel, BorderLayout.CENTER);
+        // Split pane với tỷ lệ giống MemberPanel
+        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+        splitPane.setTopComponent(topSection);
+        splitPane.setBottomComponent(tablePanel);
+        splitPane.setResizeWeight(0.6); // Đặt tỷ lệ giống với MemberPanel
+        splitPane.setDividerSize(5);
+        splitPane.setBorder(null);
 
-        // Initialize table
+        // Add to main panel
+        add(splitPane, BorderLayout.CENTER);
+
+        // Maintain split proportion
+        addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                splitPane.setDividerLocation(0.6);
+            }
+        });
+
         updateData();
+    }
+
+    private void handleSearch() {
+        String query = searchField.getText().trim().toLowerCase();
+        if (query.isEmpty()) {
+            updateData();
+            return;
+        }
+
+        // Tìm kiếm kết hợp theo cả mã sách, tên sách và tác giả
+        List<Book> searchResults = new ArrayList<>();
+        for (Book book : bookManager.getAllBooks()) {
+            if (book.getId().toLowerCase().contains(query) ||
+                book.getTitle().toLowerCase().contains(query) ||
+                book.getAuthor().toLowerCase().contains(query)) {
+                searchResults.add(book);
+            }
+        }
+
+        updateSearchResults(searchResults);
+    }
+
+    private void updateSearchResults(List<Book> books) {
+        DefaultTableModel model = (DefaultTableModel) bookTable.getModel();
+        model.setRowCount(0);
+        books.forEach(book -> model.addRow(new Object[]{
+            book.getId(),
+            book.getTitle(),
+            book.getAuthor(),
+            convertBookTypeToVietnamese(book.getType()),
+            book.isFavorite()
+        }));
+    }
+
+    private JPanel createSearchPanel() {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 15));
+
+        searchField = new JTextField(40);
+        searchField.setPreferredSize(new Dimension(500, 35));
+        searchField.setFont(new Font("Arial", Font.PLAIN, 14));
+        searchField.putClientProperty("JTextField.placeholderText", "Nhập mã sách, tên sách hoặc tác giả để tìm kiếm...");
+
+        searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { handleSearch(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { handleSearch(); }
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { handleSearch(); }
+        });
+
+        searchButton = new JButton("Làm mới");
+        searchButton.setFont(new Font("Arial", Font.BOLD, 14));
+        searchButton.setPreferredSize(new Dimension(120, 35));
+        searchButton.setBackground(new Color(240, 240, 240));
+        searchButton.setFocusPainted(false);
+        searchButton.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(200, 200, 200)),
+            BorderFactory.createEmptyBorder(5, 15, 5, 15)
+        ));
+        
+        searchButton.addActionListener(e -> {
+            searchField.setText("");
+            updateData();
+        });
+
+        panel.add(searchField);
+        panel.add(searchButton);
+
+        return panel;
     }
 
     private JPanel createFormPanel() {
         JPanel formPanel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 10, 5, 10);
+        gbc.insets = new Insets(8, 15, 8, 15);
         gbc.fill = GridBagConstraints.BOTH;
         gbc.anchor = GridBagConstraints.WEST;
 
-        // Initialize form components
-        Dimension fixedSize = new Dimension(250, 40);
+        // Kích thước cho các ô input (giảm xuống vì chia 2 cột)
+        Dimension fixedSize = new Dimension(250, 35);
         idField = new JTextField();
         titleField = new JTextField();
         authorField = new JTextField();
@@ -90,7 +194,6 @@ public class BookPanel extends JPanel {
             "Sách giấy", "Sách điện tử", "Sách học thuật", "Sách giải trí"
         });
 
-        // Style components
         Font inputFont = new Font("Arial", Font.PLAIN, 14);
         Component[] inputs = {idField, titleField, authorField, typeCombo};
         for (Component comp : inputs) {
@@ -99,7 +202,7 @@ public class BookPanel extends JPanel {
             comp.setMinimumSize(fixedSize);
         }
 
-        // Labels
+        // Labels với kích thước phù hợp
         JLabel[] labels = {
             new JLabel("Mã Sách:"),
             new JLabel("Tên Sách:"),
@@ -107,43 +210,60 @@ public class BookPanel extends JPanel {
             new JLabel("Loại Sách:")
         };
         Font labelFont = new Font("Arial", Font.BOLD, 14);
+        Dimension labelSize = new Dimension(100, 35);
         for (JLabel label : labels) {
             label.setFont(labelFont);
+            label.setPreferredSize(labelSize);
             label.setHorizontalAlignment(SwingConstants.RIGHT);
         }
 
-        // Add components to form
+        // Sắp xếp thành 2 cột
         for (int i = 0; i < labels.length; i++) {
-            gbc.gridx = 0;
-            gbc.gridy = i;
-            gbc.weightx = 0.3;
+            // Tính toán vị trí hàng và cột
+            int row = i / 2;    // 0, 0, 1, 1
+            int col = i % 2;    // 0, 1, 0, 1
+            
+            // Label
+            gbc.gridx = col * 2;  // 0, 2, 0, 2
+            gbc.gridy = row;      // 0, 0, 1, 1
+            gbc.weightx = 0.1;
             formPanel.add(labels[i], gbc);
 
-            gbc.gridx = 1;
-            gbc.weightx = 0.7;
+            // Input field
+            gbc.gridx = col * 2 + 1;  // 1, 3, 1, 3
+            gbc.weightx = 0.4;
             formPanel.add(inputs[i], gbc);
         }
 
-        return formPanel;
-    }
+        // Wrap formPanel in a container with padding
+        JPanel formContainer = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        formContainer.add(formPanel);
+        formContainer.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
 
+        return formContainer;
+    }
     private JPanel createButtonPanel() {
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
-        
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 30, 15)); // Tăng khoảng cách giữa các nút
+
         JButton addButton = new JButton("Thêm Sách");
         JButton updateButton = new JButton("Cập Nhật");
         JButton removeButton = new JButton("Xóa Sách");
         JButton refreshButton = new JButton("Làm Mới");
 
-        // Style buttons
-        Dimension buttonSize = new Dimension(120, 35);
+        // Tăng kích thước nút
+        Dimension buttonSize = new Dimension(150, 40);
         Font buttonFont = new Font("Arial", Font.BOLD, 14);
         for (JButton button : new JButton[]{addButton, updateButton, removeButton, refreshButton}) {
             button.setFont(buttonFont);
             button.setPreferredSize(buttonSize);
+            button.setBackground(new Color(240, 240, 240));
+            button.setFocusPainted(false);
+            button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(200, 200, 200)),
+                BorderFactory.createEmptyBorder(5, 15, 5, 15)
+            ));
         }
 
-        // Add button actions
         addButton.addActionListener(e -> handleAddBook());
         updateButton.addActionListener(e -> handleUpdateBook());
         removeButton.addActionListener(e -> handleRemoveBook());
@@ -154,13 +274,16 @@ public class BookPanel extends JPanel {
         buttonPanel.add(removeButton);
         buttonPanel.add(refreshButton);
 
+        // Thêm padding cho panel chứa nút
+        buttonPanel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+
         return buttonPanel;
     }
 
     private JPanel createTablePanel() {
         JPanel tablePanel = new JPanel(new BorderLayout());
         tablePanel.setBorder(new EmptyBorder(0, 20, 20, 20));
-        
+
         String[] columnNames = {"Mã Sách", "Tên Sách", "Tác Giả", "Loại", "Yêu thích"};
         DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
@@ -173,7 +296,7 @@ public class BookPanel extends JPanel {
                 return String.class;
             }
         };
-        
+
         bookTable = new JTable(tableModel);
         setupTable();
 
@@ -185,7 +308,7 @@ public class BookPanel extends JPanel {
             javax.swing.border.TitledBorder.TOP,
             new Font("Arial", Font.BOLD, 18)
         ));
-        
+
         tablePanel.add(scrollPane, BorderLayout.CENTER);
         return tablePanel;
     }
@@ -196,7 +319,6 @@ public class BookPanel extends JPanel {
         bookTable.getTableHeader().setFont(new Font("Arial", Font.BOLD, 16));
         bookTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
-        // Add selection listener
         bookTable.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 int row = bookTable.getSelectedRow();
@@ -210,7 +332,6 @@ public class BookPanel extends JPanel {
             }
         });
 
-        // Add checkbox listener
         bookTable.getModel().addTableModelListener(e -> {
             int row = e.getFirstRow();
             int col = e.getColumn();
@@ -227,7 +348,7 @@ public class BookPanel extends JPanel {
         String title = titleField.getText();
         String author = authorField.getText();
         String type = (String) typeCombo.getSelectedItem();
-        
+
         if (!validateFields(id, title, author) || !validateDuplicateBook(id)) {
             return;
         }
@@ -251,19 +372,19 @@ public class BookPanel extends JPanel {
             String title = titleField.getText();
             String author = authorField.getText();
             String type = (String) typeCombo.getSelectedItem();
-            
+
             String englishType = convertBookType(type);
             AbstractBookFactory factory = getBookFactory(englishType);
             Book newBook = factory.createBook(id, title, author);
             newBook.setFavorite(oldBook.isFavorite());
-            
+
             bookManager.removeBook(id);
             decoratedBooks.remove(id);
             FavoriteBookDecorator decorator = new FavoriteBookDecorator(newBook);
             decoratedBooks.put(id, decorator);
             newBook.registerObserver(mainGUI);
             bookManager.addBook(newBook);
-            
+
             updateData();
             clearForm();
             JOptionPane.showMessageDialog(this, "Cập nhật sách thành công!");
@@ -316,7 +437,6 @@ public class BookPanel extends JPanel {
         });
         model.fireTableDataChanged();
     }
-
     private void clearForm() {
         idField.setText("");
         titleField.setText("");

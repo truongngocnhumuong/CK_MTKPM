@@ -1,7 +1,7 @@
 package librarygui;
 
-import javax.swing.*;
 import java.awt.*;
+import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import observer.Observer;
 import singleton.*;
@@ -57,6 +57,7 @@ public class MainLibraryGUI extends JFrame implements Observer {
         add(mainPanel);
     }
 
+    
     @Override
     public void update(String event, Object data) {
         SwingUtilities.invokeLater(() -> {
